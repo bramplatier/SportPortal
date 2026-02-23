@@ -431,4 +431,276 @@ router.get('/stats', (req, res) => {
   }
 });
 
+// ============================================================
+// GET /api/admin/requests - Alle aanvragen ophalen
+// ============================================================
+router.get('/requests', (req, res) => {
+  try {
+    const requests = db
+      .prepare(`
+        SELECT 
+          r.*,
+          u.name AS user_name,
+          u.email AS user_email,
+          a.name AS responded_by_name
+        FROM requests r
+        JOIN users u ON u.id = r.user_id
+        LEFT JOIN users a ON a.id = r.responded_by
+        ORDER BY 
+          CASE r.status 
+            WHEN 'open' THEN 1 
+            WHEN 'in_progress' THEN 2 
+            ELSE 3 
+          END,
+          r.created_at DESC
+      `)
+      .all();
+
+    res.json({ requests });
+  } catch (err) {
+    console.error('Admin requests fetch error:', err);
+    res.status(500).json({ error: 'Kon aanvragen niet ophalen.' });
+  }
+});
+
+// ============================================================
+// PUT /api/admin/requests/:id - Aanvraag status bijwerken
+// ============================================================
+router.put(
+  '/requests/:id',
+  [
+    body('status')
+      .isIn(['open', 'in_progress', 'approved', 'denied', 'completed'])
+      .withMessage('Ongeldige status.'),
+    body('admin_response')
+      .optional({ values: 'falsy' })
+      .trim()
+      .isLength({ max: 500 })
+      .withMessage('Reactie mag maximaal 500 tekens zijn.'),
+    handleValidationErrors,
+  ],
+  (req, res) => {
+    try {
+      const requestId = parseInt(req.params.id);
+      if (isNaN(requestId)) {
+        return res.status(400).json({ error: 'Ongeldig aanvraag-ID.' });
+      }
+
+      const existing = db.prepare('SELECT id FROM requests WHERE id = ?').get(requestId);
+      if (!existing) {
+        return res.status(404).json({ error: 'Aanvraag niet gevonden.' });
+      }
+
+      const { status, admin_response } = req.body;
+
+      db.prepare(`
+        UPDATE requests 
+        SET status = ?, admin_response = ?, responded_by = ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `).run(status, admin_response || null, req.user.id, requestId);
+
+      const updated = db
+        .prepare(`
+          SELECT r.*, u.name AS user_name, a.name AS responded_by_name
+          FROM requests r
+          JOIN users u ON u.id = r.user_id
+          LEFT JOIN users a ON a.id = r.responded_by
+          WHERE r.id = ?
+        `)
+        .get(requestId);
+
+      res.json({ message: 'Aanvraag bijgewerkt.', request: updated });
+    } catch (err) {
+      console.error('Admin request update error:', err);
+      res.status(500).json({ error: 'Kon aanvraag niet bijwerken.' });
+    }
+  }
+);
+
+// ============================================================
+// DELETE /api/admin/requests/:id - Aanvraag verwijderen
+// ============================================================
+router.delete('/requests/:id', (req, res) => {
+  try {
+    const requestId = parseInt(req.params.id);
+    if (isNaN(requestId)) {
+      return res.status(400).json({ error: 'Ongeldig aanvraag-ID.' });
+    }
+
+    const existing = db.prepare('SELECT id FROM requests WHERE id = ?').get(requestId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Aanvraag niet gevonden.' });
+    }
+
+    db.prepare('DELETE FROM requests WHERE id = ?').run(requestId);
+
+    res.json({ message: 'Aanvraag verwijderd.' });
+  } catch (err) {
+    console.error('Admin request delete error:', err);
+    res.status(500).json({ error: 'Kon aanvraag niet verwijderen.' });
+  }
+});
+
+// ============================================================
+// GET /api/admin/announcements - Alle aankondigingen ophalen (admin)
+// ============================================================
+router.get('/announcements', (req, res) => {
+  try {
+    const announcements = db
+      .prepare(`
+        SELECT a.*, u.name AS author_name
+        FROM announcements a
+        JOIN users u ON u.id = a.created_by
+        ORDER BY a.is_pinned DESC, a.created_at DESC
+      `)
+      .all();
+
+    res.json({ announcements });
+  } catch (err) {
+    console.error('Admin announcements fetch error:', err);
+    res.status(500).json({ error: 'Kon aankondigingen niet ophalen.' });
+  }
+});
+
+// ============================================================
+// POST /api/admin/announcements - Nieuwe aankondiging
+// ============================================================
+router.post(
+  '/announcements',
+  [
+    body('title')
+      .trim()
+      .notEmpty()
+      .withMessage('Titel is verplicht.')
+      .isLength({ min: 3, max: 150 })
+      .withMessage('Titel moet tussen 3 en 150 tekens zijn.'),
+    body('content')
+      .trim()
+      .notEmpty()
+      .withMessage('Inhoud is verplicht.')
+      .isLength({ min: 10, max: 2000 })
+      .withMessage('Inhoud moet tussen 10 en 2000 tekens zijn.'),
+    body('category')
+      .isIn(['general', 'schedule', 'maintenance', 'event'])
+      .withMessage('Ongeldige categorie.'),
+    body('is_pinned')
+      .optional()
+      .isBoolean()
+      .withMessage('is_pinned moet een boolean zijn.'),
+    handleValidationErrors,
+  ],
+  (req, res) => {
+    try {
+      const { title, content, category, is_pinned } = req.body;
+
+      const stmt = db.prepare(
+        'INSERT INTO announcements (title, content, category, is_pinned, created_by) VALUES (?, ?, ?, ?, ?)'
+      );
+      const result = stmt.run(title, content, category, is_pinned ? 1 : 0, req.user.id);
+
+      const announcement = db
+        .prepare(`
+          SELECT a.*, u.name AS author_name 
+          FROM announcements a 
+          JOIN users u ON u.id = a.created_by 
+          WHERE a.id = ?
+        `)
+        .get(result.lastInsertRowid);
+
+      res.status(201).json({ message: 'Aankondiging geplaatst.', announcement });
+    } catch (err) {
+      console.error('Admin announcement create error:', err);
+      res.status(500).json({ error: 'Kon aankondiging niet plaatsen.' });
+    }
+  }
+);
+
+// ============================================================
+// PUT /api/admin/announcements/:id - Aankondiging bewerken
+// ============================================================
+router.put(
+  '/announcements/:id',
+  [
+    body('title')
+      .trim()
+      .notEmpty()
+      .withMessage('Titel is verplicht.')
+      .isLength({ min: 3, max: 150 })
+      .withMessage('Titel moet tussen 3 en 150 tekens zijn.'),
+    body('content')
+      .trim()
+      .notEmpty()
+      .withMessage('Inhoud is verplicht.')
+      .isLength({ min: 10, max: 2000 })
+      .withMessage('Inhoud moet tussen 10 en 2000 tekens zijn.'),
+    body('category')
+      .isIn(['general', 'schedule', 'maintenance', 'event'])
+      .withMessage('Ongeldige categorie.'),
+    body('is_pinned')
+      .optional()
+      .isBoolean()
+      .withMessage('is_pinned moet een boolean zijn.'),
+    handleValidationErrors,
+  ],
+  (req, res) => {
+    try {
+      const announcementId = parseInt(req.params.id);
+      if (isNaN(announcementId)) {
+        return res.status(400).json({ error: 'Ongeldig aankondiging-ID.' });
+      }
+
+      const existing = db.prepare('SELECT id FROM announcements WHERE id = ?').get(announcementId);
+      if (!existing) {
+        return res.status(404).json({ error: 'Aankondiging niet gevonden.' });
+      }
+
+      const { title, content, category, is_pinned } = req.body;
+
+      db.prepare(`
+        UPDATE announcements 
+        SET title = ?, content = ?, category = ?, is_pinned = ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `).run(title, content, category, is_pinned ? 1 : 0, announcementId);
+
+      const announcement = db
+        .prepare(`
+          SELECT a.*, u.name AS author_name 
+          FROM announcements a 
+          JOIN users u ON u.id = a.created_by 
+          WHERE a.id = ?
+        `)
+        .get(announcementId);
+
+      res.json({ message: 'Aankondiging bijgewerkt.', announcement });
+    } catch (err) {
+      console.error('Admin announcement update error:', err);
+      res.status(500).json({ error: 'Kon aankondiging niet bijwerken.' });
+    }
+  }
+);
+
+// ============================================================
+// DELETE /api/admin/announcements/:id - Aankondiging verwijderen
+// ============================================================
+router.delete('/announcements/:id', (req, res) => {
+  try {
+    const announcementId = parseInt(req.params.id);
+    if (isNaN(announcementId)) {
+      return res.status(400).json({ error: 'Ongeldig aankondiging-ID.' });
+    }
+
+    const existing = db.prepare('SELECT id FROM announcements WHERE id = ?').get(announcementId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Aankondiging niet gevonden.' });
+    }
+
+    db.prepare('DELETE FROM announcements WHERE id = ?').run(announcementId);
+
+    res.json({ message: 'Aankondiging verwijderd.' });
+  } catch (err) {
+    console.error('Admin announcement delete error:', err);
+    res.status(500).json({ error: 'Kon aankondiging niet verwijderen.' });
+  }
+});
+
 module.exports = router;

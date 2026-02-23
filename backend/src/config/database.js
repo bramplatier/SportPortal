@@ -46,6 +46,37 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_registrations_user ON registrations(user_id);
   CREATE INDEX IF NOT EXISTS idx_registrations_lesson ON registrations(lesson_id);
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+  CREATE TABLE IF NOT EXISTS requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    category TEXT NOT NULL CHECK(category IN ('equipment', 'facility', 'lesson', 'other')),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'approved', 'denied', 'completed')),
+    admin_response TEXT,
+    responded_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (responded_by) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'general' CHECK(category IN ('general', 'schedule', 'maintenance', 'event')),
+    is_pinned INTEGER NOT NULL DEFAULT 0,
+    created_by INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_requests_user ON requests(user_id);
+  CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
+  CREATE INDEX IF NOT EXISTS idx_announcements_pinned ON announcements(is_pinned);
 `);
 
 module.exports = db;

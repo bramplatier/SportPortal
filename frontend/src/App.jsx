@@ -7,9 +7,14 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import MyLessons from './pages/MyLessons';
+import Requests from './pages/Requests';
+import Announcements from './pages/Announcements';
+import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLessons from './pages/AdminLessons';
 import AdminUsers from './pages/AdminUsers';
+import AdminRequests from './pages/AdminRequests';
+import AdminAnnouncements from './pages/AdminAnnouncements';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -52,6 +57,30 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/aanvragen"
+            element={
+              <ProtectedRoute>
+                <Requests />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mededelingen"
+            element={
+              <ProtectedRoute>
+                <Announcements />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profiel"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
           {/* Admin routes */}
           <Route
             path="/admin"
@@ -74,6 +103,22 @@ export default function App() {
             element={
               <AdminRoute>
                 <AdminUsers />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/aanvragen"
+            element={
+              <AdminRoute>
+                <AdminRequests />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/mededelingen"
+            element={
+              <AdminRoute>
+                <AdminAnnouncements />
               </AdminRoute>
             }
           />

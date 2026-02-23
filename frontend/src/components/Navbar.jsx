@@ -24,6 +24,12 @@ export default function Navbar() {
         <Link to="/mijn-lessen" className={isActive('/mijn-lessen')}>
           ✅ Mijn Inschrijvingen
         </Link>
+        <Link to="/aanvragen" className={isActive('/aanvragen')}>
+          📩 Aanvragen
+        </Link>
+        <Link to="/mededelingen" className={isActive('/mededelingen')}>
+          📢 Mededelingen
+        </Link>
 
         {isAdmin && (
           <>
@@ -37,13 +43,21 @@ export default function Navbar() {
             <Link to="/admin/gebruikers" className={isActive('/admin/gebruikers')}>
               👥 Gebruikers
             </Link>
+            <Link to="/admin/aanvragen" className={isActive('/admin/aanvragen')}>
+              📋 Aanvragen
+            </Link>
+            <Link to="/admin/mededelingen" className={isActive('/admin/mededelingen')}>
+              📢 Mededelingen
+            </Link>
           </>
         )}
       </div>
 
       <div className="navbar-user">
         {isAdmin && <span className="admin-badge">🛡️ Admin</span>}
-        <span className="user-name">👤 {user.name}</span>
+        <Link to="/profiel" className="user-name-link">
+          👤 {user.name}
+        </Link>
         <button onClick={logout} className="btn btn-logout">
           Uitloggen
         </button>
