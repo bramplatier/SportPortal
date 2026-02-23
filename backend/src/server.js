@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
 const lessonRoutes = require('./routes/lessons');
 const registrationRoutes = require('./routes/registrations');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -57,6 +58,7 @@ app.use(express.json({ limit: '10kb' })); // Beperk body grootte
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/lessons', lessonRoutes);
 app.use('/api/registrations', registrationRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

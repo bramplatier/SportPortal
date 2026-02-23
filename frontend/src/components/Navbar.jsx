@@ -8,6 +8,7 @@ export default function Navbar() {
   if (!user) return null;
 
   const isActive = (path) => location.pathname === path ? 'nav-link active' : 'nav-link';
+  const isAdmin = user.role === 'admin';
 
   return (
     <nav className="navbar">
@@ -23,9 +24,25 @@ export default function Navbar() {
         <Link to="/mijn-lessen" className={isActive('/mijn-lessen')}>
           ✅ Mijn Inschrijvingen
         </Link>
+
+        {isAdmin && (
+          <>
+            <span className="nav-divider">|</span>
+            <Link to="/admin" className={isActive('/admin')}>
+              ⚙️ Dashboard
+            </Link>
+            <Link to="/admin/lessen" className={isActive('/admin/lessen')}>
+              📝 Lessen Beheer
+            </Link>
+            <Link to="/admin/gebruikers" className={isActive('/admin/gebruikers')}>
+              👥 Gebruikers
+            </Link>
+          </>
+        )}
       </div>
 
       <div className="navbar-user">
+        {isAdmin && <span className="admin-badge">🛡️ Admin</span>}
         <span className="user-name">👤 {user.name}</span>
         <button onClick={logout} className="btn btn-logout">
           Uitloggen
